@@ -319,11 +319,11 @@ ralph_print_afk_iteration() {
 ralph_check_signals() {
   local output="$1"
 
-  if printf '%s' "$output" | grep -q "<promise>COMPLETE</promise>"; then
+  if [[ "$output" == *"<promise>COMPLETE</promise>"* ]]; then
     return 1
   fi
 
-  if printf '%s' "$output" | grep -q "<promise>BLOCKED</promise>"; then
+  if [[ "$output" == *"<promise>BLOCKED</promise>"* ]]; then
     return 2
   fi
 
