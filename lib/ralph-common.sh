@@ -209,7 +209,7 @@ ralph_invoke_cli() {
       --file "$spec_file" --file "AGENTS.md" --file "$plan_file" --file "$prompt_file"
     ;;
   codex)
-    codex exec --full-auto --yolo "$(cat "$prompt_file")"
+    codex exec --full-auto "$(cat "$prompt_file")"
     ;;
   cursor-agent)
     cursor-agent -p "$(cat "$prompt_file")"
@@ -241,7 +241,7 @@ ralph_invoke_cli_capture() {
       --file "$spec_file" --file "AGENTS.md" --file "$plan_file" --file "$prompt_file" 2>&1 || true
     ;;
   codex)
-    codex exec --full-auto --yolo "$(cat "$prompt_file")" 2>&1 || true
+    codex exec --full-auto "$(cat "$prompt_file")" 2>&1 || true
     ;;
   cursor-agent)
     cursor-agent -p "$(cat "$prompt_file")" 2>&1 || true
