@@ -8,7 +8,7 @@
 4. Update plan status section. Plan only. Do NOT implement. Do NOT commit code changes.
 5. If inconsistencies found between spec and implementation, note them in plan.
 
-**IMPORTANT: DO NOT commit spec files or IMPLEMENTATION_PLAN.md. These are working documents for Ralph coordination, not code to be versioned.**
+**IMPORTANT: DO NOT commit spec files, IMPLEMENTATION_PLAN.md, or AGENTS.md. These are working documents for Ralph coordination, not code to be versioned.**
 
 999. Keep AGENTS.md operational only — do not duplicate status here.
 

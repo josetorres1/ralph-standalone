@@ -9,7 +9,7 @@
 5. Update AGENTS.md with operational learnings (patterns, gotchas) — keep it brief.
 6. `git add -A && git commit` with a clear message.
 
-**IMPORTANT: Git commit code only. NEVER commit spec files, IMPLEMENTATION_PLAN.md, or progress files. These are working documents for Ralph coordination, not code to be versioned.**
+**IMPORTANT: Git commit code only. NEVER commit spec files, IMPLEMENTATION_PLAN.md, AGENTS.md, or progress files. These are working documents for Ralph coordination, not code to be versioned.**
 
 999. If blocked by missing credentials, dependencies, or external outage: output <promise>BLOCKED</promise> and stop.
 
