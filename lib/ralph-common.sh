@@ -181,8 +181,8 @@ ralph_load_prompt_template() {
   plan_escaped=$(printf '%s' "$plan_file" | sed 's/[&/\]/\\&/g')
 
   sed -e "s/{{SPEC_FILE}}/${spec_escaped}/g" \
-      -e "s/{{PLAN_FILE}}/${plan_escaped}/g" \
-      "$template_file"
+    -e "s/{{PLAN_FILE}}/${plan_escaped}/g" \
+    "$template_file"
 }
 
 # ---------------------------------------------------------------------------
@@ -244,7 +244,7 @@ ralph_invoke_cli_capture() {
     codex exec --full-auto "$(cat "$prompt_file")" 2>&1 || true
     ;;
   cursor-agent)
-    cursor-agent -p "$(cat "$prompt_file")" 2>&1 || true
+    cursor-agent -p --force "$(cat "$prompt_file")" 2>&1 || true
     ;;
   claude)
     claude --dangerously-skip-permissions --print <"$prompt_file" 2>&1 || true
@@ -319,11 +319,17 @@ ralph_print_afk_iteration() {
 ralph_check_signals() {
   local output="$1"
 
-  if [[ "$output" == *"<promise>COMPLETE</promise>"* ]]; then
+  # Treat signals as valid only when they are the final non-empty line.
+  # This avoids false positives when tags are mentioned in instructions
+  # or quoted mid-response.
+  local last_non_empty
+  last_non_empty=$(printf '%s\n' "$output" | awk 'NF { line=$0 } END { print line }')
+
+  if [[ "$last_non_empty" == "<promise>COMPLETE</promise>" ]]; then
     return 1
   fi
 
-  if [[ "$output" == *"<promise>BLOCKED</promise>"* ]]; then
+  if [[ "$last_non_empty" == "<promise>BLOCKED</promise>" ]]; then
     return 2
   fi
 

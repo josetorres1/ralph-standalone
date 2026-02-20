@@ -1,15 +1,18 @@
-0a. Study `{{SPEC_FILE}}` to understand requirements.
-0b. Study AGENTS.md for codebase context.
-0c. Study `{{PLAN_FILE}}` (if present; it may be incorrect).
+0a. Read `{{SPEC_FILE}}` to understand requirements and acceptance criteria.
+0b. Read `AGENTS.md` for codebase context and constraints.
+0c. Read `{{PLAN_FILE}}` if it exists (it may be stale or incorrect).
 
-1. Perform gap analysis: compare requirements against existing code. Don't assume not implemented; confirm by searching.
-2. Create or update `{{PLAN_FILE}}` as a prioritized bullet list of tasks yet to implement. Ultrathink.
-3. Capture the why for each task — link to acceptance criteria from spec.
-4. Update plan status section. Plan only. Do NOT implement. Do NOT commit code changes.
-5. If inconsistencies found between spec and implementation, note them in plan.
+1. Perform gap analysis: compare requirements to current implementation; confirm by searching code.
+2. Create or update `{{PLAN_FILE}}` as a prioritized list of remaining implementation tasks.
+3. For each task, include the reason and map it to acceptance criteria.
+4. Update plan status section only; planning mode only (no implementation).
+5. Record any spec/implementation inconsistencies in `{{PLAN_FILE}}`.
+6. Keep `AGENTS.md` operational only; do not duplicate planning status there.
 
-**IMPORTANT: DO NOT commit spec files, IMPLEMENTATION_PLAN.md, or AGENTS.md. These are working documents for Ralph coordination, not code to be versioned.**
+IMPORTANT:
+- Do not commit `{{SPEC_FILE}}`, `{{PLAN_FILE}}`, or `AGENTS.md`.
+- Do not implement code in plan mode.
 
-999. Keep AGENTS.md operational only — do not duplicate status here.
-
-COMPLETE: If plan is comprehensive and ready, output <promise>COMPLETE</promise> as the last line.
+TERMINAL SIGNALS:
+- If planning is comprehensive and ready, the final non-empty line must be exactly:
+<promise>COMPLETE</promise>

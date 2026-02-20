@@ -69,8 +69,9 @@ ralph_init_plan_file "$plan_file" "$spec_file"
 # Cleanup trap
 # ---------------------------------------------------------------------------
 prompt_file=".ralph-prompt.txt"
+output_file=".ralph-output.tmp"
 cleanup() {
-  rm -f "$prompt_file"
+  rm -f "$prompt_file" "$output_file"
 }
 trap cleanup EXIT
 
@@ -96,9 +97,10 @@ for i in $(seq 1 "$max_iterations"); do
 
   printf '%s\n' "$prompt_body" >"$prompt_file"
 
-  # Invoke CLI and capture output for signal detection
-  OUTPUT=$(ralph_invoke_cli_capture "$cli" "$mode" "$prompt_file" "$spec_file" "$plan_file")
-  printf '%s\n' "$OUTPUT"
+  # Invoke CLI — stream output in real-time and capture for signal detection
+  ralph_invoke_cli_capture "$cli" "$mode" "$prompt_file" "$spec_file" "$plan_file" | tee "$output_file"
+  OUTPUT=$(cat "$output_file")
+  rm -f "$output_file"
 
   # Check for terminal signals
   ralph_check_signals "$OUTPUT"

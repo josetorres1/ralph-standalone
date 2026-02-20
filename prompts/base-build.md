@@ -1,16 +1,20 @@
-0a. Study `{{SPEC_FILE}}` to understand requirements.
-0b. Study AGENTS.md for validation commands and codebase patterns.
-0c. Study `{{PLAN_FILE}}` to find the highest-priority incomplete task.
+0a. Read `{{SPEC_FILE}}` to understand requirements.
+0b. Read `AGENTS.md` for validation commands and repo patterns.
+0c. Read `{{PLAN_FILE}}` and select the highest-priority incomplete task.
 
-1. Pick the most important incomplete task. Don't assume not implemented; confirm by searching first.
-2. Implement one small, focused increment. No placeholders or stubs — implement completely or document as blocked.
-3. Run feedback loops from AGENTS.md (typecheck, lint, tests). All must pass. Fix issues before proceeding.
-4. Update `{{PLAN_FILE}}`: mark task complete, note discoveries, add any new bugs found.
-5. Update AGENTS.md with operational learnings (patterns, gotchas) — keep it brief.
-6. `git add -A && git commit` with a clear message.
+1. Verify the task is actually incomplete by searching code first.
+2. Implement one small, focused increment; no placeholders or stubs.
+3. Run required feedback loops from `AGENTS.md` (typecheck, lint, tests); fix failures.
+4. Update `{{PLAN_FILE}}`: mark progress, record discoveries, add newly found issues.
+5. Update `AGENTS.md` with brief operational learnings only.
+6. Commit code changes with a clear message.
 
-**IMPORTANT: Git commit code only. NEVER commit spec files, IMPLEMENTATION_PLAN.md, AGENTS.md, or progress files. These are working documents for Ralph coordination, not code to be versioned.**
+IMPORTANT:
+- Commit code only.
+- Never commit `{{SPEC_FILE}}`, `{{PLAN_FILE}}`, `AGENTS.md`, or progress/coordination files.
 
-999. If blocked by missing credentials, dependencies, or external outage: output <promise>BLOCKED</promise> and stop.
-
-COMPLETE: If ALL tasks in plan are complete, output <promise>COMPLETE</promise> as the last line.
+TERMINAL SIGNALS:
+- If blocked by missing credentials, missing dependencies, or external outage, the final non-empty line must be exactly:
+<promise>BLOCKED</promise>
+- If all planned tasks are complete, the final non-empty line must be exactly:
+<promise>COMPLETE</promise>
