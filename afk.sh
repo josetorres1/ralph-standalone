@@ -42,7 +42,9 @@ base_branch="${RALPH_BASE_BRANCH}"
 ralph_validate_spec "$spec_file" || {
   printf 'Usage: %s [mode] [cli] <spec_file> [task_slug] [max_iterations]\n' "$0" >&2
   printf '       %s plan opencode tasks/spec.md\n' "$0" >&2
+  printf '       %s plan gemini tasks/spec.md\n' "$0" >&2
   printf '       %s build opencode tasks/spec.md 20\n' "$0" >&2
+  printf '       %s build codex tasks/spec.md 20\n' "$0" >&2
   printf '       RALPH_SPEC=<spec_file> %s\n' "$0" >&2
   exit 1
 }
@@ -60,10 +62,15 @@ printf 'Creating branch: %s from %s\n' "$branch_name" "$base_branch"
 git switch -c "$branch_name"
 
 # ---------------------------------------------------------------------------
-# Initialize IMPLEMENTATION_PLAN.md if missing using shared library
+# Initialize operational files if missing using shared library
 # ---------------------------------------------------------------------------
 plan_file="IMPLEMENTATION_PLAN.md"
+progress_file="progress.txt"
+agents_file="AGENTS.md"
+
 ralph_init_plan_file "$plan_file" "$spec_file"
+ralph_init_progress_file "$progress_file"
+ralph_init_agents_file "$agents_file"
 
 # ---------------------------------------------------------------------------
 # Cleanup trap
@@ -85,34 +92,67 @@ else
   template_file="${template_dir}/base-build.md"
 fi
 
-prompt_body=$(ralph_load_prompt_template "$template_file" "$spec_file" "$plan_file")
+prompt_body=$(ralph_load_prompt_template "$template_file" "$spec_file" "$plan_file" "$progress_file" "$agents_file")
 
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
 ralph_print_afk_header "$mode" "$cli" "$spec_file" "$plan_file" "$max_iterations" "$branch_name"
 
+saw_complete=0
+complete_iteration=0
+consecutive_no_progress=0
+last_commit_hash=$(git rev-parse HEAD)
+
 for i in $(seq 1 "$max_iterations"); do
   ralph_print_afk_iteration "$i" "$max_iterations" "$cli" "$mode"
 
   printf '%s\n' "$prompt_body" >"$prompt_file"
 
-  # Invoke CLI — stream output in real-time and capture for signal detection
-  ralph_invoke_cli_capture "$cli" "$mode" "$prompt_file" "$spec_file" "$plan_file" | tee "$output_file"
+  # Invoke CLI — stream output in real-time and capture raw output for signal detection.
+  # Promise tags are suppressed from streamed output so only afk.sh emits final terminal signals.
+  ralph_invoke_cli_capture "$cli" "$mode" "$prompt_file" "$spec_file" "$plan_file" "$progress_file" "$agents_file" \
+    | tee "$output_file" \
+    | sed '/^<promise>COMPLETE<\/promise>$/d; /^<promise>BLOCKED<\/promise>$/d'
   OUTPUT=$(cat "$output_file")
   rm -f "$output_file"
 
   # Check for terminal signals
-  ralph_check_signals "$OUTPUT"
-  signal_result=$?
+  if ralph_check_signals "$OUTPUT"; then
+    signal_result=0
+  else
+    signal_result=$?
+  fi
+
+  # Track progress via git commits
+  current_commit_hash=$(git rev-parse HEAD)
+  if [ "$current_commit_hash" = "$last_commit_hash" ] && [ "$signal_result" -eq 0 ]; then
+    consecutive_no_progress=$((consecutive_no_progress + 1))
+    printf '\nNo progress detected (no commits, no signals) for %s iteration(s).\n' "$consecutive_no_progress"
+  else
+    consecutive_no_progress=0
+    last_commit_hash="$current_commit_hash"
+  fi
+
+  if [ "$consecutive_no_progress" -ge 3 ]; then
+    printf '\nStuck detected: 3 consecutive iterations without progress. Blocking.\n'
+    ralph_print_afk_blocked "$i" "$max_iterations" "$plan_file"
+    printf '<promise>BLOCKED</promise>\n'
+    exit 2
+  fi
 
   if [ "$signal_result" -eq 1 ]; then
-    ralph_print_afk_complete "$i" "$max_iterations" "$branch_name"
-    exit 0
+    saw_complete=1
+    if [ "$complete_iteration" -eq 0 ]; then
+      complete_iteration="$i"
+    fi
+    # If we saw COMPLETE, we stop the loop immediately to avoid redundant iterations
+    break
   fi
 
   if [ "$signal_result" -eq 2 ]; then
     ralph_print_afk_blocked "$i" "$max_iterations" "$plan_file"
+    printf '<promise>BLOCKED</promise>\n'
     exit 2
   fi
 
@@ -120,5 +160,20 @@ for i in $(seq 1 "$max_iterations"); do
   sleep 2
 done
 
+if [ "$saw_complete" -eq 1 ]; then
+  ralph_print_afk_complete "$complete_iteration" "$max_iterations" "$branch_name"
+  
+  # Human-in-the-loop checkpoint for planning
+  if [ "$mode" = "plan" ] && [ -t 0 ]; then
+    printf '\nPlanning complete. Review %s and %s.\n' "$plan_file" "$progress_file"
+    printf 'Press Enter to exit or Ctrl+C to abort...\n'
+    read -r _
+  fi
+
+  printf '<promise>COMPLETE</promise>\n'
+  exit 0
+fi
+
 ralph_print_afk_max_iter "$max_iterations" "$branch_name" "$plan_file"
+printf '<promise>BLOCKED</promise>\n'
 exit 1

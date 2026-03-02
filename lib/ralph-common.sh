@@ -79,10 +79,10 @@ ralph_validate_mode() {
 ralph_validate_cli() {
   local cli="$1"
   case "$cli" in
-  claude | codex | cursor-agent | opencode) ;;
+  claude | codex | cursor-agent | gemini | opencode) ;;
   *)
     printf 'Unsupported CLI: %s\n' "$cli" >&2
-    printf 'Use one of: opencode, codex, cursor-agent, claude\n' >&2
+    printf 'Use one of: opencode, codex, cursor-agent, claude, gemini\n' >&2
     return 1
     ;;
   esac
@@ -106,6 +106,11 @@ ralph_validate_spec() {
   local spec_file="$1"
   if [ -z "$spec_file" ]; then
     printf 'Error: spec_file is required\n' >&2
+    return 1
+  fi
+
+  if [[ ! "$spec_file" =~ \.(md|json)$ ]]; then
+    printf 'Error: spec_file must be .md or .json, got: %s\n' "$spec_file" >&2
     return 1
   fi
 }
@@ -158,16 +163,59 @@ ralph_init_plan_file() {
 }
 
 # ---------------------------------------------------------------------------
+# Initialize progress.txt if missing (high-density context)
+# ---------------------------------------------------------------------------
+ralph_init_progress_file() {
+  local progress_file="${1:-progress.txt}"
+  if [ ! -f "$progress_file" ]; then
+    {
+      printf 'LAST_TASK: None\n'
+      printf 'STATUS: Initializing\n'
+      printf 'NEXT_STEPS:\n'
+      printf '- Initial planning\n'
+    } >"$progress_file"
+    printf 'Initialized %s\n' "$progress_file"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Initialize AGENTS.md if missing (validation source of truth)
+# ---------------------------------------------------------------------------
+ralph_init_agents_file() {
+  local agents_file="${1:-AGENTS.md}"
+  if [ ! -f "$agents_file" ]; then
+    {
+      printf '# Agent Instructions\n\n'
+      printf '## Project Patterns\n\n'
+      printf '- Use parallel subagents for research.\n'
+      printf '- Follow idiomatic TypeScript/Node patterns.\n\n'
+      printf '## Validation Commands\n\n'
+      printf '```bash\n'
+      printf '# Edit these to match your project\n'
+      printf 'npm test\n'
+      printf 'npm run lint\n'
+      printf 'npm run typecheck\n'
+      printf '```\n'
+    } >"$agents_file"
+    printf 'Initialized %s\n' "$agents_file"
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # Load prompt template and substitute placeholders
 # ---------------------------------------------------------------------------
 # Placeholders supported:
-#   {{SPEC_FILE}}  - Replaced with spec file path
-#   {{PLAN_FILE}}  - Replaced with plan file path
+#   {{SPEC_FILE}}      - Replaced with spec file path
+#   {{PLAN_FILE}}      - Replaced with plan file path
+#   {{PROGRESS_FILE}}  - Replaced with progress file path
+#   {{AGENTS_FILE}}    - Replaced with agents file path
 # ---------------------------------------------------------------------------
 ralph_load_prompt_template() {
   local template_file="$1"
   local spec_file="$2"
   local plan_file="${3:-IMPLEMENTATION_PLAN.md}"
+  local progress_file="${4:-progress.txt}"
+  local agents_file="${5:-AGENTS.md}"
 
   if [ ! -f "$template_file" ]; then
     printf 'Error: Template file not found: %s\n' "$template_file" >&2
@@ -176,12 +224,16 @@ ralph_load_prompt_template() {
 
   # Read template and substitute placeholders using sed
   # Escape special characters in paths for sed
-  local spec_escaped plan_escaped
+  local spec_escaped plan_escaped progress_escaped agents_escaped
   spec_escaped=$(printf '%s' "$spec_file" | sed 's/[&/\]/\\&/g')
   plan_escaped=$(printf '%s' "$plan_file" | sed 's/[&/\]/\\&/g')
+  progress_escaped=$(printf '%s' "$progress_file" | sed 's/[&/\]/\\&/g')
+  agents_escaped=$(printf '%s' "$agents_file" | sed 's/[&/\]/\\&/g')
 
   sed -e "s/{{SPEC_FILE}}/${spec_escaped}/g" \
     -e "s/{{PLAN_FILE}}/${plan_escaped}/g" \
+    -e "s/{{PROGRESS_FILE}}/${progress_escaped}/g" \
+    -e "s/{{AGENTS_FILE}}/${agents_escaped}/g" \
     "$template_file"
 }
 
@@ -189,11 +241,13 @@ ralph_load_prompt_template() {
 # Invoke CLI with appropriate arguments
 # ---------------------------------------------------------------------------
 # Arguments:
-#   $1 - CLI name (opencode, codex, cursor-agent, claude)
+#   $1 - CLI name (opencode, codex, cursor-agent, claude, gemini)
 #   $2 - Mode (plan, build)
 #   $3 - Path to prompt file containing the full prompt
-#   $4 - spec_file path (for opencode file attachments)
-#   $5 - plan_file path (for opencode file attachments)
+#   $4 - spec_file path
+#   $5 - plan_file path
+#   $6 - progress_file path
+#   $7 - agents_file path
 # ---------------------------------------------------------------------------
 ralph_invoke_cli() {
   local cli="$1"
@@ -201,15 +255,20 @@ ralph_invoke_cli() {
   local prompt_file="$3"
   local spec_file="$4"
   local plan_file="${5:-IMPLEMENTATION_PLAN.md}"
+  local progress_file="${6:-progress.txt}"
+  local agents_file="${7:-AGENTS.md}"
 
   case "$cli" in
   opencode)
     opencode run -m opencode/kimi-k2.5 \
-      "Execute Ralph ${mode}. Read spec, AGENTS.md, plan, and instructions." \
-      --file "$spec_file" --file "AGENTS.md" --file "$plan_file" --file "$prompt_file"
+      "Execute Ralph ${mode}. Read spec, ${agents_file}, ${plan_file}, ${progress_file}, and instructions." \
+      --file "$spec_file" --file "$agents_file" --file "$plan_file" --file "$progress_file" --file "$prompt_file"
     ;;
   codex)
-    codex exec --full-auto "$(cat "$prompt_file")"
+    codex exec --yolo "$(cat "$prompt_file")"
+    ;;
+  gemini)
+    gemini --approval-mode=yolo "$(cat "$prompt_file")"
     ;;
   cursor-agent)
     cursor-agent -p "$(cat "$prompt_file")"
@@ -218,7 +277,7 @@ ralph_invoke_cli() {
     claude --dangerously-skip-permissions --print <"$prompt_file"
     ;;
   *)
-    "$cli" --permission-mode acceptEdits "@${spec_file} @AGENTS.md @${plan_file} $(cat "$prompt_file")"
+    "$cli" --permission-mode acceptEdits "@${spec_file} @${agents_file} @${plan_file} @${progress_file} $(cat "$prompt_file")"
     ;;
   esac
 }
@@ -233,15 +292,20 @@ ralph_invoke_cli_capture() {
   local prompt_file="$3"
   local spec_file="$4"
   local plan_file="${5:-IMPLEMENTATION_PLAN.md}"
+  local progress_file="${6:-progress.txt}"
+  local agents_file="${7:-AGENTS.md}"
 
   case "$cli" in
   opencode)
     opencode run -m opencode/kimi-k2.5 \
-      "Execute Ralph ${mode}. Read spec, AGENTS.md, plan, and instructions." \
-      --file "$spec_file" --file "AGENTS.md" --file "$plan_file" --file "$prompt_file" 2>&1 || true
+      "Execute Ralph ${mode}. Read spec, ${agents_file}, ${plan_file}, ${progress_file}, and instructions." \
+      --file "$spec_file" --file "$agents_file" --file "$plan_file" --file "$progress_file" --file "$prompt_file" 2>&1 || true
     ;;
   codex)
-    codex exec --full-auto "$(cat "$prompt_file")" 2>&1 || true
+    codex exec --yolo "$(cat "$prompt_file")" 2>&1 || true
+    ;;
+  gemini)
+    gemini --approval-mode=yolo "$(cat "$prompt_file")" 2>&1 || true
     ;;
   cursor-agent)
     cursor-agent -p --force "$(cat "$prompt_file")" 2>&1 || true
@@ -250,7 +314,7 @@ ralph_invoke_cli_capture() {
     claude --dangerously-skip-permissions --print <"$prompt_file" 2>&1 || true
     ;;
   *)
-    "$cli" --permission-mode acceptEdits "@${spec_file} @AGENTS.md @${plan_file} $(cat "$prompt_file")" 2>&1 || true
+    "$cli" --permission-mode acceptEdits "@${spec_file} @${agents_file} @${plan_file} @${progress_file} $(cat "$prompt_file")" 2>&1 || true
     ;;
   esac
 }

@@ -37,7 +37,9 @@ base_branch="${RALPH_BASE_BRANCH}"
 ralph_validate_spec "$spec_file" || {
   printf 'Usage: %s [mode] [cli] <spec_file> [task_slug]\n' "$0" >&2
   printf '       %s plan opencode tasks/spec.md\n' "$0" >&2
+  printf '       %s plan gemini tasks/spec.md\n' "$0" >&2
   printf '       %s build opencode tasks/spec.md\n' "$0" >&2
+  printf '       %s build codex tasks/spec.md\n' "$0" >&2
   printf '       RALPH_SPEC=<spec_file> %s\n' "$0" >&2
   exit 1
 }
@@ -54,10 +56,15 @@ printf 'Creating branch: %s from %s\n' "$branch_name" "$base_branch"
 git switch -c "$branch_name"
 
 # ---------------------------------------------------------------------------
-# Initialize IMPLEMENTATION_PLAN.md if missing using shared library
+# Initialize operational files if missing using shared library
 # ---------------------------------------------------------------------------
 plan_file="IMPLEMENTATION_PLAN.md"
+progress_file="progress.txt"
+agents_file="AGENTS.md"
+
 ralph_init_plan_file "$plan_file" "$spec_file"
+ralph_init_progress_file "$progress_file"
+ralph_init_agents_file "$agents_file"
 
 # ---------------------------------------------------------------------------
 # Cleanup trap
@@ -78,7 +85,7 @@ else
   template_file="${template_dir}/base-build.md"
 fi
 
-prompt_body=$(ralph_load_prompt_template "$template_file" "$spec_file" "$plan_file")
+prompt_body=$(ralph_load_prompt_template "$template_file" "$spec_file" "$plan_file" "$progress_file" "$agents_file")
 
 # ---------------------------------------------------------------------------
 # Execute using shared library
@@ -87,7 +94,7 @@ ralph_print_header "$mode" "$cli" "$spec_file" "$branch_name"
 
 printf '%s\n' "$prompt_body" >"$prompt_file"
 
-ralph_invoke_cli "$cli" "$mode" "$prompt_file" "$spec_file" "$plan_file"
+ralph_invoke_cli "$cli" "$mode" "$prompt_file" "$spec_file" "$plan_file" "$progress_file" "$agents_file"
 exit_code=$?
 
 ralph_print_completion "$exit_code" "$branch_name"
