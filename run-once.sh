@@ -6,7 +6,7 @@
 # Environment variable fallbacks:
 #   RALPH_MODE         (default: build)
 #   RALPH_CLI          (default: opencode)
-#   RALPH_SPEC         (required - no default)
+#   RALPH_SPEC         (optional; auto-detects tasks/spec.md, spec.md, tasks/spec.json, spec.json)
 #   RALPH_TASK_SLUG    (optional)
 #   RALPH_BASE_BRANCH  (default: current branch)
 
@@ -41,6 +41,7 @@ ralph_validate_spec "$spec_file" || {
   printf '       %s build opencode tasks/spec.md\n' "$0" >&2
   printf '       %s build codex tasks/spec.md\n' "$0" >&2
   printf '       RALPH_SPEC=<spec_file> %s\n' "$0" >&2
+  printf '       (or create tasks/spec.md or spec.md)\n' >&2
   exit 1
 }
 
