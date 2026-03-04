@@ -31,8 +31,12 @@ export PATH="$HOME/Developer/ralph-standalone:$PATH"
 2. Run from anywhere:
 
 ```bash
-afk.sh
-run-once.sh
+# With explicit spec
+run-once.sh plan opencode tasks/spec.md
+
+# Or rely on defaults when one exists:
+# tasks/spec.md, spec.md, tasks/spec.json, spec.json
+run-once.sh plan
 ```
 
 ## Contributing

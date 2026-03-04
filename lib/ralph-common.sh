@@ -19,6 +19,27 @@ set -euo pipefail
 #   RALPH_MODE, RALPH_CLI, RALPH_SPEC_FILE, RALPH_TASK_SLUG, RALPH_MAX_ITER, RALPH_BASE_BRANCH
 
 # ---------------------------------------------------------------------------
+# Resolve spec file from explicit arg/env or default local candidates
+# ---------------------------------------------------------------------------
+ralph_resolve_spec_file() {
+  local provided_spec="${1:-}"
+  if [ -n "$provided_spec" ]; then
+    printf '%s' "$provided_spec"
+    return 0
+  fi
+
+  local candidate
+  for candidate in "tasks/spec.md" "spec.md" "tasks/spec.json" "spec.json"; do
+    if [ -f "$candidate" ]; then
+      printf '%s' "$candidate"
+      return 0
+    fi
+  done
+
+  printf ''
+}
+
+# ---------------------------------------------------------------------------
 # Parse arguments with mode support
 # Fixes the bug where task_slug was read from wrong position after shift
 # ---------------------------------------------------------------------------
@@ -48,6 +69,8 @@ ralph_parse_args() {
     arg_task="${3:-${RALPH_TASK_SLUG:-}}"
     arg_max_iter="${4:-${RALPH_MAX_ITER:-10}}"
   fi
+
+  arg_spec="$(ralph_resolve_spec_file "$arg_spec")"
 
   # Set global variables for caller
   RALPH_MODE="$arg_mode"
@@ -105,12 +128,17 @@ ralph_validate_max_iter() {
 ralph_validate_spec() {
   local spec_file="$1"
   if [ -z "$spec_file" ]; then
-    printf 'Error: spec_file is required\n' >&2
+    printf 'Error: spec_file is required (arg, RALPH_SPEC, or one of: tasks/spec.md, spec.md, tasks/spec.json, spec.json)\n' >&2
     return 1
   fi
 
   if [[ ! "$spec_file" =~ \.(md|json)$ ]]; then
     printf 'Error: spec_file must be .md or .json, got: %s\n' "$spec_file" >&2
+    return 1
+  fi
+
+  if [ ! -f "$spec_file" ]; then
+    printf 'Error: spec_file not found: %s\n' "$spec_file" >&2
     return 1
   fi
 }
@@ -151,9 +179,9 @@ ralph_init_plan_file() {
       printf 'Generated: %s\n' "$(date)"
       printf 'Spec: %s\n\n' "$spec_file"
       printf '## Status\n\n'
-      printf '- [ ] Gap analysis complete\n'
-      printf '- [ ] Planning phase complete\n'
-      printf '- [ ] Build phase\n\n'
+      printf '%s\n' '- [ ] Gap analysis complete'
+      printf '%s\n' '- [ ] Planning phase complete'
+      printf '%s\n\n' '- [ ] Build phase'
       printf '## Tasks\n\n'
       printf '## Open Questions / Notes\n\n'
       printf '## Inconsistencies (None Found)\n\n'
@@ -172,7 +200,7 @@ ralph_init_progress_file() {
       printf 'LAST_TASK: None\n'
       printf 'STATUS: Initializing\n'
       printf 'NEXT_STEPS:\n'
-      printf '- Initial planning\n'
+      printf '%s\n' '- Initial planning'
     } >"$progress_file"
     printf 'Initialized %s\n' "$progress_file"
   fi
@@ -187,8 +215,8 @@ ralph_init_agents_file() {
     {
       printf '# Agent Instructions\n\n'
       printf '## Project Patterns\n\n'
-      printf '- Use parallel subagents for research.\n'
-      printf '- Follow idiomatic TypeScript/Node patterns.\n\n'
+      printf '%s\n' '- Use parallel subagents for research.'
+      printf '%s\n\n' '- Follow idiomatic TypeScript/Node patterns.'
       printf '## Validation Commands\n\n'
       printf '```bash\n'
       printf '# Edit these to match your project\n'
@@ -268,7 +296,7 @@ ralph_invoke_cli() {
     codex exec --yolo "$(cat "$prompt_file")"
     ;;
   gemini)
-    gemini --approval-mode=yolo "$(cat "$prompt_file")"
+    gemini --approval-mode=yolo -p "$(cat "$prompt_file")"
     ;;
   cursor-agent)
     cursor-agent -p "$(cat "$prompt_file")"
@@ -305,7 +333,7 @@ ralph_invoke_cli_capture() {
     codex exec --yolo "$(cat "$prompt_file")" 2>&1 || true
     ;;
   gemini)
-    gemini --approval-mode=yolo "$(cat "$prompt_file")" 2>&1 || true
+    gemini --approval-mode=yolo -p "$(cat "$prompt_file")" 2>&1 || true
     ;;
   cursor-agent)
     cursor-agent -p --force "$(cat "$prompt_file")" 2>&1 || true
