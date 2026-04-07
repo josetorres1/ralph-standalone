@@ -15,6 +15,12 @@
 
 set -euo pipefail
 
+# ---------------------------------------------------------------------------
+# Signal constants — single source of truth for promise tags
+# ---------------------------------------------------------------------------
+RALPH_SIGNAL_COMPLETE="<promise>COMPLETE</promise>"
+RALPH_SIGNAL_BLOCKED="<promise>BLOCKED</promise>"
+
 # Global variables set by ralph_parse_args():
 #   RALPH_MODE, RALPH_CLI, RALPH_SPEC_FILE, RALPH_TASK_SLUG, RALPH_MAX_ITER, RALPH_BASE_BRANCH
 
@@ -167,26 +173,13 @@ ralph_generate_branch_name() {
 }
 
 # ---------------------------------------------------------------------------
-# Initialize IMPLEMENTATION_PLAN.md if missing
+# Initialize prd.json if missing (empty task array)
 # ---------------------------------------------------------------------------
-ralph_init_plan_file() {
-  local plan_file="${1:-IMPLEMENTATION_PLAN.md}"
-  local spec_file="${2:-spec.md}"
-
-  if [ ! -f "$plan_file" ]; then
-    {
-      printf '# Implementation Plan\n\n'
-      printf 'Generated: %s\n' "$(date)"
-      printf 'Spec: %s\n\n' "$spec_file"
-      printf '## Status\n\n'
-      printf '%s\n' '- [ ] Gap analysis complete'
-      printf '%s\n' '- [ ] Planning phase complete'
-      printf '%s\n\n' '- [ ] Build phase'
-      printf '## Tasks\n\n'
-      printf '## Open Questions / Notes\n\n'
-      printf '## Inconsistencies (None Found)\n\n'
-    } >"$plan_file"
-    printf 'Initialized %s\n' "$plan_file"
+ralph_init_prd_file() {
+  local prd_file="${1:-prd.json}"
+  if [ ! -f "$prd_file" ]; then
+    printf '[]\n' >"$prd_file"
+    printf 'Initialized %s\n' "$prd_file"
   fi
 }
 
@@ -417,11 +410,11 @@ ralph_check_signals() {
   local last_non_empty
   last_non_empty=$(printf '%s\n' "$output" | awk 'NF { line=$0 } END { print line }')
 
-  if [[ "$last_non_empty" == "<promise>COMPLETE</promise>" ]]; then
+  if [[ "$last_non_empty" == "$RALPH_SIGNAL_COMPLETE" ]]; then
     return 1
   fi
 
-  if [[ "$last_non_empty" == "<promise>BLOCKED</promise>" ]]; then
+  if [[ "$last_non_empty" == "$RALPH_SIGNAL_BLOCKED" ]]; then
     return 2
   fi
 
