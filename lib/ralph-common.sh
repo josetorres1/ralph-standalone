@@ -249,14 +249,14 @@ ralph_init_agents_file() {
 # ---------------------------------------------------------------------------
 # Placeholders supported:
 #   {{SPEC_FILE}}      - Replaced with spec file path
-#   {{PLAN_FILE}}      - Replaced with plan file path
+#   {{PRD_FILE}}       - Replaced with prd.json path
 #   {{PROGRESS_FILE}}  - Replaced with progress file path
 #   {{AGENTS_FILE}}    - Replaced with agents file path
 # ---------------------------------------------------------------------------
 ralph_load_prompt_template() {
   local template_file="$1"
   local spec_file="$2"
-  local plan_file="${3:-IMPLEMENTATION_PLAN.md}"
+  local prd_file="${3:-prd.json}"
   local progress_file="${4:-progress.txt}"
   local agents_file="${5:-AGENTS.md}"
 
@@ -265,16 +265,14 @@ ralph_load_prompt_template() {
     return 1
   fi
 
-  # Read template and substitute placeholders using sed
-  # Escape special characters in paths for sed
-  local spec_escaped plan_escaped progress_escaped agents_escaped
+  local spec_escaped prd_escaped progress_escaped agents_escaped
   spec_escaped=$(printf '%s' "$spec_file" | sed 's/[&/\]/\\&/g')
-  plan_escaped=$(printf '%s' "$plan_file" | sed 's/[&/\]/\\&/g')
+  prd_escaped=$(printf '%s' "$prd_file" | sed 's/[&/\]/\\&/g')
   progress_escaped=$(printf '%s' "$progress_file" | sed 's/[&/\]/\\&/g')
   agents_escaped=$(printf '%s' "$agents_file" | sed 's/[&/\]/\\&/g')
 
   sed -e "s/{{SPEC_FILE}}/${spec_escaped}/g" \
-    -e "s/{{PLAN_FILE}}/${plan_escaped}/g" \
+    -e "s/{{PRD_FILE}}/${prd_escaped}/g" \
     -e "s/{{PROGRESS_FILE}}/${progress_escaped}/g" \
     -e "s/{{AGENTS_FILE}}/${agents_escaped}/g" \
     "$template_file"
@@ -288,7 +286,7 @@ ralph_load_prompt_template() {
 #   $2 - Mode (plan, build)
 #   $3 - Path to prompt file containing the full prompt
 #   $4 - spec_file path
-#   $5 - plan_file path
+#   $5 - prd_file path
 #   $6 - progress_file path
 #   $7 - agents_file path
 # ---------------------------------------------------------------------------
@@ -297,15 +295,15 @@ ralph_invoke_cli() {
   local mode="$2"
   local prompt_file="$3"
   local spec_file="$4"
-  local plan_file="${5:-IMPLEMENTATION_PLAN.md}"
+  local prd_file="${5:-prd.json}"
   local progress_file="${6:-progress.txt}"
   local agents_file="${7:-AGENTS.md}"
 
   case "$cli" in
   opencode)
     opencode run -m opencode/kimi-k2.5 \
-      "Execute Ralph ${mode}. Read spec, ${agents_file}, ${plan_file}, ${progress_file}, and instructions." \
-      --file "$spec_file" --file "$agents_file" --file "$plan_file" --file "$progress_file" --file "$prompt_file"
+      "Execute Ralph ${mode}. Read spec, ${agents_file}, ${prd_file}, ${progress_file}, and instructions." \
+      --file "$spec_file" --file "$agents_file" --file "$prd_file" --file "$progress_file" --file "$prompt_file"
     ;;
   codex)
     codex exec --yolo "$(cat "$prompt_file")"
@@ -320,7 +318,7 @@ ralph_invoke_cli() {
     claude --dangerously-skip-permissions --print <"$prompt_file"
     ;;
   *)
-    "$cli" --permission-mode acceptEdits "@${spec_file} @${agents_file} @${plan_file} @${progress_file} $(cat "$prompt_file")"
+    "$cli" --permission-mode acceptEdits "@${spec_file} @${agents_file} @${prd_file} @${progress_file} $(cat "$prompt_file")"
     ;;
   esac
 }
@@ -334,15 +332,15 @@ ralph_invoke_cli_capture() {
   local mode="$2"
   local prompt_file="$3"
   local spec_file="$4"
-  local plan_file="${5:-IMPLEMENTATION_PLAN.md}"
+  local prd_file="${5:-prd.json}"
   local progress_file="${6:-progress.txt}"
   local agents_file="${7:-AGENTS.md}"
 
   case "$cli" in
   opencode)
     opencode run -m opencode/kimi-k2.5 \
-      "Execute Ralph ${mode}. Read spec, ${agents_file}, ${plan_file}, ${progress_file}, and instructions." \
-      --file "$spec_file" --file "$agents_file" --file "$plan_file" --file "$progress_file" --file "$prompt_file" 2>&1 || true
+      "Execute Ralph ${mode}. Read spec, ${agents_file}, ${prd_file}, ${progress_file}, and instructions." \
+      --file "$spec_file" --file "$agents_file" --file "$prd_file" --file "$progress_file" --file "$prompt_file" 2>&1 || true
     ;;
   codex)
     codex exec --yolo "$(cat "$prompt_file")" 2>&1 || true
@@ -357,7 +355,7 @@ ralph_invoke_cli_capture() {
     claude --dangerously-skip-permissions --print <"$prompt_file" 2>&1 || true
     ;;
   *)
-    "$cli" --permission-mode acceptEdits "@${spec_file} @${agents_file} @${plan_file} @${progress_file} $(cat "$prompt_file")" 2>&1 || true
+    "$cli" --permission-mode acceptEdits "@${spec_file} @${agents_file} @${prd_file} @${progress_file} $(cat "$prompt_file")" 2>&1 || true
     ;;
   esac
 }
@@ -388,7 +386,7 @@ ralph_print_afk_header() {
   local mode="$1"
   local cli="$2"
   local spec_file="$3"
-  local plan_file="$4"
+  local prd_file="$4"
   local max_iterations="$5"
   local branch_name="$6"
 
@@ -397,7 +395,7 @@ ralph_print_afk_header() {
   printf '  Mode:           %s\n' "$mode"
   printf '  CLI:            %s\n' "$cli"
   printf '  Spec:           %s\n' "$spec_file"
-  printf '  Plan:           %s\n' "$plan_file"
+  printf '  PRD:            %s\n' "$prd_file"
   printf '  Max iterations: %s\n' "$max_iterations"
   printf '  Branch:         %s\n' "$branch_name"
   printf '\n'
@@ -477,26 +475,26 @@ ralph_print_afk_complete() {
 ralph_print_afk_blocked() {
   local iteration="$1"
   local max_iterations="$2"
-  local plan_file="$3"
+  local prd_file="$3"
 
   printf '\n'
   printf '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
   printf '  Ralph AFK — BLOCKED\n'
   printf '  Stopped at iteration %s of %s\n' "$iteration" "$max_iterations"
   printf '  Non-recoverable blocker encountered.\n'
-  printf '  Check %s for details.\n' "$plan_file"
+  printf '  Check %s for details.\n' "$prd_file"
   printf '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
 }
 
 ralph_print_afk_max_iter() {
   local max_iterations="$1"
   local branch_name="$2"
-  local plan_file="$3"
+  local prd_file="$3"
 
   printf '\n'
   printf '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
   printf '  Ralph AFK — Max iterations reached (%s)\n' "$max_iterations"
   printf "  Branch '%s' may have partial work.\n" "$branch_name"
-  printf '  Check %s for status.\n' "$plan_file"
+  printf '  Check %s for status.\n' "$prd_file"
   printf '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
 }
