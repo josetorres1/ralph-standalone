@@ -118,6 +118,28 @@ ralph_validate_cli() {
 }
 
 # ---------------------------------------------------------------------------
+# Validate jq is installed (required for prd.json parsing)
+# ---------------------------------------------------------------------------
+ralph_validate_jq() {
+  if ! command -v jq &>/dev/null; then
+    printf 'Error: jq is required but not installed.\n' >&2
+    printf 'Install with: brew install jq\n' >&2
+    return 1
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Check if all prd.json tasks have passes: true
+# Returns 0 if complete (no passes:false entries), 1 if incomplete
+# ---------------------------------------------------------------------------
+ralph_check_prd_complete() {
+  local prd_file="$1"
+  local remaining
+  remaining=$(jq '[.[] | select(.passes == false)] | length' "$prd_file")
+  [ "$remaining" -eq 0 ]
+}
+
+# ---------------------------------------------------------------------------
 # Validate max_iterations is a positive integer
 # ---------------------------------------------------------------------------
 ralph_validate_max_iter() {
