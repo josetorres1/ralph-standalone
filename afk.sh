@@ -65,11 +65,12 @@ git switch -c "$branch_name"
 # ---------------------------------------------------------------------------
 # Initialize operational files if missing using shared library
 # ---------------------------------------------------------------------------
-plan_file="IMPLEMENTATION_PLAN.md"
+prd_file="prd.json"
 progress_file="progress.txt"
 agents_file="AGENTS.md"
 
-ralph_init_plan_file "$plan_file" "$spec_file"
+ralph_validate_jq || exit 1
+ralph_init_prd_file "$prd_file"
 ralph_init_progress_file "$progress_file"
 ralph_init_agents_file "$agents_file"
 
@@ -93,12 +94,38 @@ else
   template_file="${template_dir}/base-build.md"
 fi
 
-prompt_body=$(ralph_load_prompt_template "$template_file" "$spec_file" "$plan_file" "$progress_file" "$agents_file")
+prompt_body=$(ralph_load_prompt_template "$template_file" "$spec_file" "$prd_file" "$progress_file" "$agents_file")
+
+# ---------------------------------------------------------------------------
+# Append AFK-specific terminal signals (not included in base prompts)
+# ---------------------------------------------------------------------------
+if [ "$mode" = "plan" ]; then
+  prompt_body="${prompt_body}
+
+TERMINAL SIGNALS:
+- If blocked by missing information or an ambiguous spec, the final non-empty line must be exactly:
+${RALPH_SIGNAL_BLOCKED}
+- If planning is comprehensive and ready, the final non-empty line must be exactly:
+${RALPH_SIGNAL_COMPLETE}"
+else
+  prompt_body="${prompt_body}
+
+TERMINAL SIGNALS:
+- If blocked by missing credentials, missing dependencies, or external outage, the final non-empty line must be exactly:
+${RALPH_SIGNAL_BLOCKED}
+- If all planned tasks are complete, the final non-empty line must be exactly:
+${RALPH_SIGNAL_COMPLETE}"
+fi
+
+# Pre-compute sed pattern for stripping signal tags from streamed output
+_complete_esc="${RALPH_SIGNAL_COMPLETE//\//\\/}"
+_blocked_esc="${RALPH_SIGNAL_BLOCKED//\//\\/}"
+_strip_pattern="/^${_complete_esc}$/d; /^${_blocked_esc}$/d"
 
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
-ralph_print_afk_header "$mode" "$cli" "$spec_file" "$plan_file" "$max_iterations" "$branch_name"
+ralph_print_afk_header "$mode" "$cli" "$spec_file" "$prd_file" "$max_iterations" "$branch_name"
 
 saw_complete=0
 complete_iteration=0
@@ -112,9 +139,9 @@ for i in $(seq 1 "$max_iterations"); do
 
   # Invoke CLI — stream output in real-time and capture raw output for signal detection.
   # Promise tags are suppressed from streamed output so only afk.sh emits final terminal signals.
-  ralph_invoke_cli_capture "$cli" "$mode" "$prompt_file" "$spec_file" "$plan_file" "$progress_file" "$agents_file" \
+  ralph_invoke_cli_capture "$cli" "$mode" "$prompt_file" "$spec_file" "$prd_file" "$progress_file" "$agents_file" \
     | tee "$output_file" \
-    | sed '/^<promise>COMPLETE<\/promise>$/d; /^<promise>BLOCKED<\/promise>$/d'
+    | sed "$_strip_pattern"
   OUTPUT=$(cat "$output_file")
   rm -f "$output_file"
 
@@ -123,6 +150,15 @@ for i in $(seq 1 "$max_iterations"); do
     signal_result=0
   else
     signal_result=$?
+  fi
+
+  # Shell-side completion check: independently verify all prd.json tasks pass (build mode only)
+  if [ "$mode" = "build" ] && [ -f "$prd_file" ] && ralph_check_prd_complete "$prd_file"; then
+    if [ "$saw_complete" -eq 0 ]; then
+      saw_complete=1
+      complete_iteration="$i"
+    fi
+    break
   fi
 
   # Track progress via git commits
@@ -137,8 +173,8 @@ for i in $(seq 1 "$max_iterations"); do
 
   if [ "$consecutive_no_progress" -ge 3 ]; then
     printf '\nStuck detected: 3 consecutive iterations without progress. Blocking.\n'
-    ralph_print_afk_blocked "$i" "$max_iterations" "$plan_file"
-    printf '<promise>BLOCKED</promise>\n'
+    ralph_print_afk_blocked "$i" "$max_iterations" "$prd_file"
+    printf '%s\n' "$RALPH_SIGNAL_BLOCKED"
     exit 2
   fi
 
@@ -152,8 +188,8 @@ for i in $(seq 1 "$max_iterations"); do
   fi
 
   if [ "$signal_result" -eq 2 ]; then
-    ralph_print_afk_blocked "$i" "$max_iterations" "$plan_file"
-    printf '<promise>BLOCKED</promise>\n'
+    ralph_print_afk_blocked "$i" "$max_iterations" "$prd_file"
+    printf '%s\n' "$RALPH_SIGNAL_BLOCKED"
     exit 2
   fi
 
@@ -166,15 +202,15 @@ if [ "$saw_complete" -eq 1 ]; then
   
   # Human-in-the-loop checkpoint for planning
   if [ "$mode" = "plan" ] && [ -t 0 ]; then
-    printf '\nPlanning complete. Review %s and %s.\n' "$plan_file" "$progress_file"
+    printf '\nPlanning complete. Review %s and %s.\n' "$prd_file" "$progress_file"
     printf 'Press Enter to exit or Ctrl+C to abort...\n'
     read -r _
   fi
 
-  printf '<promise>COMPLETE</promise>\n'
+  printf '%s\n' "$RALPH_SIGNAL_COMPLETE"
   exit 0
 fi
 
-ralph_print_afk_max_iter "$max_iterations" "$branch_name" "$plan_file"
-printf '<promise>BLOCKED</promise>\n'
+ralph_print_afk_max_iter "$max_iterations" "$branch_name" "$prd_file"
+printf '%s\n' "$RALPH_SIGNAL_BLOCKED"
 exit 1
