@@ -59,11 +59,11 @@ git switch -c "$branch_name"
 # ---------------------------------------------------------------------------
 # Initialize operational files if missing using shared library
 # ---------------------------------------------------------------------------
-plan_file="IMPLEMENTATION_PLAN.md"
+prd_file="prd.json"
 progress_file="progress.txt"
 agents_file="AGENTS.md"
 
-ralph_init_plan_file "$plan_file" "$spec_file"
+ralph_init_prd_file "$prd_file"
 ralph_init_progress_file "$progress_file"
 ralph_init_agents_file "$agents_file"
 
@@ -86,7 +86,7 @@ else
   template_file="${template_dir}/base-build.md"
 fi
 
-prompt_body=$(ralph_load_prompt_template "$template_file" "$spec_file" "$plan_file" "$progress_file" "$agents_file")
+prompt_body=$(ralph_load_prompt_template "$template_file" "$spec_file" "$prd_file" "$progress_file" "$agents_file")
 
 # ---------------------------------------------------------------------------
 # Execute using shared library
@@ -95,7 +95,7 @@ ralph_print_header "$mode" "$cli" "$spec_file" "$branch_name"
 
 printf '%s\n' "$prompt_body" >"$prompt_file"
 
-ralph_invoke_cli "$cli" "$mode" "$prompt_file" "$spec_file" "$plan_file" "$progress_file" "$agents_file"
+ralph_invoke_cli "$cli" "$mode" "$prompt_file" "$spec_file" "$prd_file" "$progress_file" "$agents_file"
 exit_code=$?
 
 ralph_print_completion "$exit_code" "$branch_name"
